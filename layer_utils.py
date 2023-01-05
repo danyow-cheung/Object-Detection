@@ -133,10 +133,12 @@ def get_gt_data(iou,n_classes = 4,anchors = None,labels = None,normalize = False
 	'''
 	# each maxiou_per_get is index of anchor w/max iou 
 	# for the given ground truth bouding box
+	"""Equation 11.3.2""" 
 	maxiou_per_gt = np.argmax(iou,axis=0)
 
 	# get extra anchor boxes based on IoU
 	if threshold<1.0:
+		"""Extra positive anchor boxes are detemined based on a user-defined threshold"""
 		iou_gt_threshold = np.argwhere(iou>threshold)
 		if iou_gt_threshold.size > 0:
 			extra_anchors = iou_gt_threshold[:,0]
@@ -151,14 +153,79 @@ def get_gt_data(iou,n_classes = 4,anchors = None,labels = None,normalize = False
 	# mask generation
 	gt_mask = np.zeros((iou.shape[0],4))
 	# only indexes maxiou_per_gt are valid bounding boxes 
+	'''
+	只有當閾值小於 1.0 時，才會發現額外的正錨框。 
+	所有帶有ground truth bounding boxes的anchor boxes（
+	即結合positive anchor boxes和extra positive anchor boxes）
+	的索引成為ground truth mask的基礎：
+	'''
 	gt_mask[maxiou_per_gt] = 1.0 
 
+	'''初始情況下，所有候選框都被認為是背景'''
 	# classes generation
 	gt_class = np.zeros((iou.shape[0],n_classes))
 	# by default all are background (index 0)
 	gt_class [:,0] =1 
+
+	'''只有positive的候選框才會被歸納在非背景的類別'''
+	
 	# but those that belong to maxiou_per_gt are not 
 	gt_class[maxiou_per_gt,0] = 0 
 	
+	# we have to find those column indexes(classes)
+	maxiou_col = np.reshape(maxiou_per_gt,(maxiou_per_gt.shape[0],1))
+	label_col = np.reshape(labels[:4],(labels.shape[0],1)).astype(int)
 
-	
+	row_col = np.append(maxiou_col,label_col,axis=1)
+	# the label of object in maxiou_per_gt 
+	gt_class[row_col[:,0],row_col[:,1]] = 1.0 
+
+	# offsets generation
+	gt_offset = np.zeros((iou.shape[0],4))
+
+	# (cx,cy,w,h) format 
+	if normalize:
+		anchors = minmax2centroid(anchors)
+		labels = minmax2centroid(labels)
+
+		# bbox = bouding boxes
+		# ((bbox xcenter - anchor box x center)/anchor box width)/.1
+		# ((bbox ycenter - anchor box y center)/anchor box height)/.1
+		""" Equation 11.4.8 chapter11"""
+		offset2 = np.log(labels[:,2:4]/anchors[maxiou_per_gt,2:4])
+		offset2 /= 0.2
+		
+		offsets = np.concatenate([offset1,offset2],axis=-1)
+
+	# (xmin,xmax,ymin,ymax) format 
+	else:
+		offsets = labels[:,0:4] - anchors[maxiou_per_gt]
+
+	gt_offset[maxiou_per_gt] = offsets
+	return gt_class,gt_offset,gt_mask
+
+
+
+
+def minmax2centroid(boxes):
+	'''
+	MinMax to centroid format
+	(xmin,xmax,ymin,ymax) to (cx,cy,w,h)
+	Arguments:
+		boxes(tensor):	   Batch of boxes in minmax format
+	Returns:
+		centroid(tensor):  Batch of boxes in centroid format
+	'''
+	centroid = np.copy(boxes).astype(np.float)
+	centroid[...,0] = 0.5 *(boxes[...,1] - boxes[...,0])
+	centroid[...,0] += boxes[...,0]
+
+	centroid[...,1] = 0.5*(boxes[...,3] - boxes[...,2])
+	centroid[...,1] += boxes[...,2]
+
+	centroid[...,2] = boxes[...,1] - boxes[...,0]
+	centroid[...,3] = boxes[...,3] - boxes[...,2]
+
+	return centroid
+
+
