@@ -157,3 +157,84 @@ IoU等於重疊區域除以合併區域的面積
 比起使用L1損失函數，受到Fast-RCNN的啟發使用smoothL1
 
 <u>與 l1 相比，smooth 更穩健並且對異常值更不敏感</u>
+
+
+
+
+
+```python
+def focal_loss_categorical(y_true,y_pred):
+	'''Categorical cross-entropy focal loss
+	'''
+	gamma = 2.0 
+	alpha = 0.25 
+
+	# scale to ensure sum of prob is 1.0
+	y_pred /= K.sum(y_pred,axis=-1,keepdims=True)
+
+	# clip the prediction value to prevent NaN and Inf 
+	epsilon = K.epsilon()
+	y_pred = K.clip(y_pred,epsilon,1. - epsilon)
+
+	# calculate cross entropy 
+	cross_entropy = -y_true *K.log(y_pred)
+	# calculate focal loss 
+	weight = alpha *K.pow(1-y_pred,gamma)
+	cross_entropy *= weight
+	return K.sum(cross_entropy,axis=-1)
+```
+
+focal loss背後的動機是，如果我們檢查圖像，大多數錨框應該被分類為背景或負錨框。只有少數正錨框是表示目標對象的良好候選者。 <u>交叉熵損失的主要貢獻者是負錨框。</u> 因此，在優化過程中正錨框的貢獻被負錨框的貢獻所壓倒。 這種現像也稱為**類別不平衡（Class imbalance）**，其中一個或幾個類別支配其餘類別。
+
+
+
+## SSD model architectureSSD模型结构
+
+<img src = "ssd-model.png">
+
+> a base or backone network extracts features for the downstream task of classification and offset predictions.
+>
+> 基礎或主幹網為分類和預測偏移的下游任務提取特徵
+
+> after the backone network,the object detection task is performed by the rest of the network which we call ssd head.在主幹網絡之後的，ssd的頭部將進行目標檢測
+
+
+
+the backbone network can be a pre-trained network with frozen weights 主幹網絡可以是具有凍結權重的預訓練網絡
+（例如；以前接受過 ImageNet 分類訓練）或聯合訓練
+與物體檢測。 如果我們使用預訓練的基礎網絡，我們將利用以前從大型數據集中學習的<u>特徵提取過濾器的優勢</u>。 此外，由<u>於骨幹網絡參數被凍結，它加速了學習</u>。 僅訓練對象檢測中的頂層。 在本書中，骨幹網絡與目標檢測聯合訓練，因為我們假設我們不一定能夠訪問預訓練的骨幹網絡。
+
+
+
+主幹網絡一般使用幾輪的下採樣，要麼使用`strides =2 `或者是`maxpooling`
+
+
+
+> Additional feature extraction blocks can be applied after the base network.Each feature extract block is in the form of Conv2D(strides=2)-BN-ELU 特徵提取層的結構是CONV2D-BN-ELU
+
+特徵提取之後，特徵圖大小減半，過濾器數量加倍
+
+## SSD model architecture in Keras
+
+代碼示例側重於解釋多尺度對象檢測的關鍵概念。 代碼實現的某些部分可以進一步優化，例如 ground truth anchor boxes 類、偏移量和掩碼的緩存。 在我們的示例中，每次從文件系統加載圖像時，都會由一個線程計算基準值。
+
+
+
+
+
+SSD 模型使用 ResNet 作為其主幹網絡。 它調用 resnet.py 中的 ResNet V1 或 V2 模型創建器。 與前面章節中的示例不同，<u>SSD 使用的數據集由數千張高分辨率圖像組成。 多線程數據生成器從文件系統加載這些圖像並對其進行排隊。</u> 它還計算錨框的真實標籤。 如果沒有多線程數據生成器，圖像的加載和排隊以及訓練期間地面真值的計算將非常緩慢。
+有許多小而重要的例程在幕後工作。 這些都集中存儲在實用程序塊中。 這些例程創建錨框、計算 IoU、建立地面真值標籤、運行非最大抑制、繪製標籤和框、在視頻幀上顯示檢測到的對象、提供損失函數等。
+
+<img src= 'ssd-class.png'>
+
+
+
+
+
+## SSD objects in Keras
+
+1. creation of the SSD model using build_model()
+
+2. instantiating a data generator through build_generator()
+
+   gu
