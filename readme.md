@@ -135,3 +135,25 @@ IoU等於重疊區域除以合併區域的面積
 **IoU计算过程**
 
 <img src = 'IoU_cal.png'>
+
+
+
+
+
+<img src = 'equation11.4.8.png'>
+
+
+
+
+
+## Loss functions損失函數
+
+在ssd中，有上千的候選框，目標檢測的目標是，預測類別和偏差在每個候選框中。我們可以使用以下的損失函數來面對預測
+
+> 詳情看原文pdf
+
+<img src = 'loss.png'>
+
+比起使用L1損失函數，受到Fast-RCNN的啟發使用smoothL1
+
+<u>與 l1 相比，smooth 更穩健並且對異常值更不敏感</u>
