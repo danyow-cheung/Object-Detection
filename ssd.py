@@ -1,5 +1,9 @@
 import os
 import numpy as np
+import tensorflow as tf 
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+
 
 class SSD(object):
 	"""
@@ -65,3 +69,54 @@ class SSD(object):
 		self.n_classes = len(self.classes)
 
 		self.keys = np.array(list(self.dictionary.keys()))
+
+
+	def build_generator(self):
+		'''Build a multi-thread train data generator'''
+		self.train_generator = DataGenerator(
+			args=self.args,
+			dictionary=self.dictionary
+			n_classes = self.n_classes,
+			features_shapes = self.feature_shapes,
+			n_anchors = self.n_anchors,
+			shuffle=True
+		)
+
+	def train(self):
+		'''train an ssd network'''
+		# build the train data generator
+		if self.train_generator is None:
+			self.build_generator()
+
+		optimzer = Adam(lr=1e-3)
+		# choice of loss function via args
+		if self.args.improved_loss:
+			print_log("Focal loss and smooth L1",self.args.verbose)
+			loss = [focal_loss_categorical,smooth_l1_loss]
+		elif self.args.smooth_l1:
+			print_log("Smooth L1 ",self.args.verbose)
+			loss = ['categorical_crossentropy',smooth_l1_loss]
+		else:
+			print_log("Cross-entropy and L1",self.args.verbose)
+			loss = ['categorical_crossentropy',l1_loss]
+		
+		self.ssd.compile(optimzer=optimzer,loss=loss)
+
+		# prepare callbacks for saving model weights
+		# and learning rate scheduler
+		# learning rate decreases by 50% every 20 epochs
+		# after 60th epoch 
+		checkpoint = ModelCheckpoint(filepath=filepath,verbose=1,save_weights_only=True)
+
+		scheduler = LearningRateScheduler(lr_scheduler)
+
+		callbacks = [checkpoint,scheduler]
+
+		# train the ssd network
+		self.ssd.fit_generator(generator=self.train_generator,
+								use_multiprocessing =True,
+								callbacks=callbacks,
+								epochs = self.args.epochs, 
+								workers = self.args.workers
+								)
+

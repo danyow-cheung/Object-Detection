@@ -238,3 +238,42 @@ SSD 模型使用 ResNet 作為其主幹網絡。 它調用 resnet.py 中的 ResN
 2. instantiating a data generator through build_generator()
 
    gu
+
+
+
+
+
+## SSD model in Keras 
+
+
+
+
+
+## Data generator model in Keras 
+
+SSD 實現了一個多線程數據生成器。 多線程生成器的任務是加載多個小批量圖像及其相應的標籤。 由於多線程，GPU 可以保持忙碌，因為一個線程向它提供數據，而其餘 CPU 線程在隊列中準備提供另一批數據或從文件系統加載一批圖像併計算真實值 . 
+
+
+
+
+
+## Example dataset
+
+...
+
+## SSD model training 
+
+...
+
+
+
+
+
+## Non-Maximum Suppression(NMS) algorithm
+
+
+
+## SSD model validation
+
+classica NMS < soft NMS
+
