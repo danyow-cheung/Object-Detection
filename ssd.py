@@ -1,8 +1,28 @@
-import os
-import numpy as np
-import tensorflow as tf 
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import backend as K
+from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.callbacks import LearningRateScheduler
+from tensorflow.keras.losses import Huber
 
+import layer_utils
+import label_utils
+import config
+
+import os
+import skimage
+import numpy as np
+import argparse
+
+from skimage.io import imread
+from data_generator import DataGenerator
+from label_utils import build_label_dictionary
+from boxes import show_boxes
+from model import build_ssd
+from loss import focal_loss_categorical, smooth_l1_loss, l1_loss
+from model_utils import lr_scheduler, ssd_parser
+from common_utils import print_log
 
 
 class SSD(object):
@@ -119,4 +139,72 @@ class SSD(object):
 								epochs = self.args.epochs, 
 								workers = self.args.workers
 								)
+
+	def evaluate_test(self):
+		# test labels csv path
+		path = os.path.join(self.args.data_path,self.args.test_labels)
+		# test dictionary
+		dictionary ,_ =  build_label_dictionary(path)
+		keys = np.array(list(dictionary.keys()))
+		# sum of precision
+		s_precision = 0 
+		# sum of recall 
+		s_recall = 0 
+		# sum of IoUs 
+		s_iou = 0 
+		# evaluate per image 
+		for key in keys:
+			# ground truth labels
+			labels = np.array(dictionary[key])
+			# 4 boxes coords are 1st four items of labels
+			gt_boxes = labels[:,0:-1]
+			# last one is class 
+			gt_class_ids = labels[:,-1]
+			# load image id by key 
+			image_file = os.path.join(self.args.data_path,key)
+			image = skimage.img_as_float(imread(image_file))
+			image ,classes ,offsets = self.detect_objects(image)
+			# perform nms
+			_,_,class_ids ,boxes = show_boxes(
+				self.args,
+				image,
+				classes,
+				offsets,
+				self.feature_shapes,
+				show = False 
+			)
+			boxes = np.reshape(np.array(boxes),(-1,4))
+			# compute IoUs 
+			iou = label_utils.iou(gt_boxes,boxes)
+			# skip empty IoUs
+			if iou.size ==0:
+				continue
+			# the class of predicted box w/max iou 
+			maxiou_class = np.argmax(iou,axis=1)
+
+			# true positive
+			tp = 0 
+			# false postive 
+			fp = 0 
+			# sum of objects iou per image 
+			s_image_iou = []
+			for n in range(iou.shape[0]):
+				# ground truth bbox has a label
+				if iou[n,maxiou_class[n]]>0:
+					s_image_iou.append(iou[n,maxiou_class[n]])
+					# true postivie has the same class and gt 
+					if gt_class_ids[n] == class_ids[maxiou_class[n]]:
+						tp+=1
+					else:
+						fP+=1
+			# objects that we missed(false negative)
+			fn = abs(len(gt_class_ids) -tp)
+			s_iou += (np.sum(s_image_iou) / iou.shape[0])
+			s_precision += (tp/(tp+fp))
+			s_recall += (tp/(tp+fn))
+
+		n_test = len(keys)
+		print_log("mIoU: %f" % (s_iou/n_test),self.args.verbose)
+		print_log("Precision: %f" % (s_precision/n_test),self.args.verbose)
+		print_log("Recall: %f" % (s_recall/n_test),self.args.verbose)
 

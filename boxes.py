@@ -85,3 +85,51 @@ def nms(args,classes,offsets,anchors):
         scores[indexes] = np.argmax(classes[indexes],axis=1)
         return objects,indexes,scores
         
+
+def show_boxes(args,image,classes,offsets,feature_shapes,show=True):
+    '''show detected objects on an image .Show bounding boxes and class names
+    Arguments:
+        image(tensor):              Image to show detected objects(0.0 to 1.0)
+        classes(tensor):            Predicted classes 
+        offsets(tensor):            Predicted offsets
+        feature_shapes(tensor):     SSD head feature maps
+        show(bool):                 Whether to show bounding boxes or not
+    Returns:
+        class_names(list):          List of object class names
+        rects(list):                Bounding box rectangles of detected objects
+        class_ids(list):            class ids of detected objects
+        boxes(list):                Anchor boxes of detected objects
+    '''
+    # generate all anchor boxes per feature map 
+    anchors = []
+    n_layers = len(feature_shapes)
+    for index,feature_shapes in enumerate(feature_shapes):
+        anchor = anchor_boxes(feature_shapes,
+                        image.shape,
+                        index = index
+                        )
+        anchor = np.reshape(anchor,[-1,4])
+        if index ==0:
+            anchors = anchor 
+        else:
+            anchors = np.concatenate((anchors,anchor),axis=0)
+    
+    # get all non-zero (non-background) objects
+    # objects = np.argmax(claaes,axis=1)
+    # print(np.unique(objects,return_counts=True))
+    # nonbg = np.nonzero(object)[0]
+    if args.normalize:
+        print("Normalize")
+        anchors_centroid = minmax2centroid(anchors)
+        offsets[:, 0:2] *= 0.1
+        offsets[:, 0:2] *= anchors_centroid[:, 2:4]
+        offsets[:, 0:2] += anchors_centroid[:, 0:2]
+        offsets[:, 2:4] *= 0.2
+        offsets[:, 2:4] = np.exp(offsets[:, 2:4])
+        offsets[:, 2:4] *= anchors_centroid[:, 2:4]
+        offsets = centroid2minmax(offsets)
+        # convert fr cx,cy,w,h to real offsets
+        offsets[:, 0:4] = offsets[:, 0:4] - anchors
+    objects,indexes ,scores = nms(args,classes,offsets,anchors)
+    
+        
