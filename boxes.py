@@ -133,3 +133,126 @@ def show_boxes(args,image,classes,offsets,feature_shapes,show=True):
     objects,indexes ,scores = nms(args,classes,offsets,anchors)
     
         
+    class_names = []
+    rects = []
+    class_ids = []
+    boxes = []
+    if show:
+        fig,ax = plt.subplots(1)
+        ax.imshow(image)
+    yoff = 1 
+    for idx in indexes:
+        # batch row,col,box
+        anchor = anchors[idx]
+        offset = offsets[idx]
+
+        anchor += offset[0:4]
+        # default anchor box format is 
+        # xmin xmax ymin ymax 
+        boxes.append(anchor)
+
+        w = anchor[1] - anchor[0]
+        h = anchor[3] - anchor[2]
+        x = anchor[0]
+        y = anchor[2]
+        category = int(objects[idx])
+        class_ids.append(category)
+
+        class_name = index2class(category)
+        class_name = "%s: %0.2f" % (class_name, scores[idx])
+        class_names.append(class_name)
+
+        rect = (x,y,w,h)
+        print(class_name,rect)
+        rects.append(rect)
+
+        if show:
+            color = get_box_color(category)
+            rect = Rectangle((x,y),w,h,linewidth=2,edgecolor=color,facecolor='none')
+
+            ax.append_patch(rect)
+            bbox = dict(color='white',alpha = 1.0)
+            ax.text(anchor[0] + 2,
+                    anchor[2] - 16 + np.random.randint(0,yoff),
+                    class_name,
+                    color=color,
+                    #fontweight='bold',
+                    bbox=bbox,
+                    fontsize=10,
+                    verticalalignment='top')
+            yoff += 50
+
+    if show:
+        plt.savefig("detection.png", dpi=600)
+        plt.show()
+    return class_names,rects,class_ids,boxes
+
+def show_anchors(image,feature_shape,anchors,maxiou_indexes =None,maxiou_per_gt = None,labels=None,show_grids=False):
+    '''Utility for showing anchor boxes for debugging purposes'''
+    image_height,image_width ,_ = image.shape
+    _,feature_height,feature_width ,_ = feature_shape
+
+    fig,ax = plt.subplots(1)
+    ax.imshow(image)
+    if show_grids:
+        grid_height = image_height//feature_height
+        for i in range(feature_height):
+            y = i * grid_height
+            line  = Line2D([0,image_width],[y,y])
+            ax.add_line(line)
+        grid_width = image_width//feature_width
+        for i in range(feature_width):
+            x = i* grid_width
+            line = Line2D([x,x],[0,image_height])
+            ax.add_line(line)
+    
+    # maxiou_indexes is (4,n_gt)
+    for index in range(maxiou_indexes.shape[1]):
+        i = maxiou_indexes[1][index]
+        j = maxiou_indexes[2][index]
+        k = maxiou_indexes[3][index]
+
+        # color = label_utils.get_box_color()
+        box = anchors[0][i][j][k] # batch row,col,box
+        # default anchor box format is xmin,xmax,ymin,ymax
+        w = box[1] - box[0]
+        h = box[3] - box[2]
+        x = box[0]
+        y = box[2]
+        # Rectangle ((xmin,ymin),width,height)
+        rect = Rectangle((x, y),
+                         w,
+                         h,
+                         linewidth=2,
+                         edgecolor='y',
+                         facecolor='none')
+        ax.add_patch(rect)
+
+        if maxiou_per_gt is not None and labels is not None:
+            # maxiou_per_gt[index] is row w/max iou
+            iou = np.amax(maxiou_per_gt[index])
+            # argmax_index = np.argmax(maxiou_per_gt[index])
+            # offset
+            label = labels[index]
+            category = int(label[4])
+            class_name = index2class(category)
+            color = label_utils.get_box_color (category)
+            bbox = dict(facecolor=color,color=color,alpha=1.0)
+            ax.text(label[0],
+                    label[2],
+                    class_name,
+                    color='w',
+                    fontweight='bold',
+                    bbox=bbox,
+                    fontsize=16,
+                    verticalalignment='top')
+            dxmin = label[0] - box[0]
+            dxmax = label[1] - box[1]
+            dymin = label[2] - box[2]
+            dymax = label[3] - box[3]
+            print(index, ":", "(", class_name, ")", iou, dxmin, dxmax, dymin, dymax, label[0], label[2])
+    if labels is None:
+        plt.show()
+    return fig,ax 
+    
+

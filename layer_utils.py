@@ -236,3 +236,75 @@ def minmax2centroid(boxes):
 	return centroid
 
 
+
+
+
+def intersection(boxes1,boxes2):
+	'''Compute intersection of batch of boxes1 and boxes2
+	Arguments:
+		boxes1(tensor):Boxes coordinates in pixels
+		boxes2(tensor):Boxes coordinate in pixels
+	Returns:
+		intersection_areas (tensor): intersection of areas of boxes1 and boxes2 
+	'''
+	m = boxes1.shape[0]
+	n = boxes2.shape[0]
+
+	xmin = 0 
+	xmax = 1
+	ymin = 2
+	ymax = 3
+
+	boxes1_min = np.expand_dims(boxes1[:,[xmin,ymin]],axis=1)
+	boxes1_min = np.tile(boxes1_min,reps=(1,n,1))
+	boxes2_min = np.expand_dims(boxes2[:,[xmin,ymin]],axis=0)
+	boxes2_min = np.tile(boxes2_min,reps=(m,1,1))
+	min_xy = np.maximum(boxes1_min,boxes2_min)
+
+	boxes1_max = np.expand_dims(boxes1[:,[xmax,ymax]],axis=1)
+	boxes1_max = np.tile(boxes1_max,reps=(1,n,1))
+	boxes2_max = np.expand_dims(boxes2[:,[xmax,ymax]],axis=0)
+	boxes2_max = np.tile(boxes2_max,reps=(m,1,1))
+	max_xy = np.minimum(boxes1_max,boxes2_max)
+
+	side_lengths = np.maximum(0,max_xy - min_xy)
+	intersection_areas = side_lengths[:,:,0] *side_lengths[:,:,1]
+	return intersection_areas
+
+
+def union(boxes1,boxes2,intersection_areas):
+	'''Compute union of batch of boxes1 and boxes 2
+	Arguments:
+		boxes1(tensor): Boxes coordinates in pixels
+		boxes2(tensor): Boxes coordinates in pixels
+
+	
+	Returns:
+		union_areas(tensor): union of areas of boxes1 and boxes2 
+	'''
+	m = boxes1.shape[0]
+	n = boxes2.shape[0]
+
+	xmin = 0
+	xmax = 1 
+	ymin = 2 
+	ymax = 3
+
+	width = (boxes1[:,xmax] - boxes1[:,xmin])
+	height = (boxes1[:,ymax] - boxes1[:,ymin])
+	areas = width*height
+	
+	boxes1_areas = np.tile(np.expand_dims(areas,axis=1),reps=(1,n))
+	width = (boxes2[:,xmax]- boxes2)
+	height = (boxes1[:,ymax] - boxes1[:,ymin])
+	areas = width *height
+	boxes1_area = np.tile(np.expand_dims(areas,axis=1),reps=(1,n))
+	width = (boxes2[:,xmax] - boxes2[:,xmin])
+	height = (boxes2[:,ymax] - boxes2[:,ymin])
+	areas = width * height
+	boxes2_areas = np.tile(np.expand_dims(areas,axis=0),reps=(m,1))
+
+	union_areas = boxes1_area + boxes2_areas - intersection_areas
+	return union_areas
+	
+	
