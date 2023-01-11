@@ -306,5 +306,16 @@ def union(boxes1,boxes2,intersection_areas):
 
 	union_areas = boxes1_area + boxes2_areas - intersection_areas
 	return union_areas
-	
-	
+
+def iou(boxes1,boxes2):
+	'''Compute IoU of batch boxes1 and boxes2
+	Arguments:
+		boxes1(tensor): Boxes coordinates in pixels
+		boxes2(tensor): Boxes coordinates in pixels
+	Returns:
+		iou(tensor): intersection of union of areas of boxes1 and boxes2
+	'''
+	intersection_areas =intersection(boxes1,boxes2)
+	union_areas = union(boxes1,boxes2,intersection_areas)
+	return intersection_areas/union_areas
+

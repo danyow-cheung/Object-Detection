@@ -208,3 +208,53 @@ class SSD(object):
 		print_log("Precision: %f" % (s_precision/n_test),self.args.verbose)
 		print_log("Recall: %f" % (s_recall/n_test),self.args.verbose)
 
+	def restore_weights(self):
+		'''load previously trained model weights'''
+		if self.args.restore_weights:
+			save_dir = os.path.join(os.getcwd(),self.args.save_dir)
+			filename = os.path.join(save_dir,self.args.restore_weights)
+			log = "Loading weights:%s"%filename
+			print(log,self.args.verbose)
+			self.ssd.load_weights(filename)
+	
+	def detect_objects(self,image):
+		image = np.expand_dims(image,axis=0)
+		classes,offsets = self.ssd.predict(image)
+		image = np.squeeze(image,axis=0)
+		classes = np.squeeze(classes)
+		offsets = np.squeeze(offsets)
+		return image,classes,offsets
+	
+	def evaluate(self,image_file=None,image=None):
+		'''Evaluate image based on image(np tensor) or filename'''
+		show =False
+		if image is None:
+			image = skimage.img_as_float(imread(image_file))
+			show =True
+		image,classes,offsets = self.detect_objects(image)
+		class_names,rects,_,_ = show_boxes(args,image,classes,offsets,self.feature_shapes,show=show)
+		return class_names,rects 
+	
+	def print_summary(self):
+		'''Print network summary for debugging purposes'''
+		from tensorflow.keras.utils import plot_model
+		if self.args.summary:
+			self.backone.summary()
+			self.ssd.summary()
+			plot_model(self.backone,to_file='backone.png',show_shaps=True)
+	
+if __name__ =="__main__":
+	parser = ssd_parser()
+	args = parser.parse_args()
+	ssd = SSD(args)
+	if args.summary():
+		ssd.print_summary()
+	if args.restore_weights():
+		ssd.restore_weights()
+		if args.evaluate:
+			if args.image_file is None:
+				ssd.evaluate_test()
+			else:
+				ssd.evaluate(image_file=args.image_file)
+	if args.train:
+		ssd.train()

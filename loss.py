@@ -1,5 +1,8 @@
-from tensorflow.keras.losses import Huber 
+import tensorflow as tf
+from tensorflow.keras import backend as K
+from tensorflow.keras.losses import Huber
 
+import numpy as np
 
 def mask_offset(y_true,y_pred):
 	'''
@@ -54,3 +57,32 @@ def focal_loss_categorical(y_true,y_pred):
 	return K.sum(cross_entropy,axis=-1)
 
 
+def focal_loss_binary(y_true,y_pred):
+	'''Binary cross-entropy focal loss'''
+	gamma = 2.0
+	alpha =0.25
+	pt_1 = tf.where(tf.equal(y_true,1),y_pred,tf.ones_like(y_pred))
+	pt_0 = tf.where(tf.equal(y_true,0),y_pred,tf.zeros_like(y_pred))
+
+	epsilon = K.epsilon()
+	# clip to prevent NaN and Inf 
+	pt_1 = K.clip(pt_1,epsilon,1.-epsilon)
+	pt_0 = K.clip(pt_0,epsilon,1.-epsilon)
+
+	weight = alpha*K.pow(1. -pt_1,gamma)
+	fl1 = -K.sum(weight*K.log(pt_1))
+	
+	weight = (1-alpha)*K.pow(pt_0,gamma)
+	fl0 = -K.sum(weight*K.log*1.-pt_0)
+
+	return fl1+fl0 
+
+def focal_loss_ce(y_true,y_pred):
+	'''Alternative CE focal loss(not used)'''
+	# only missing in this FL is y_pred clipping
+	weight = (1-y_pred)
+	weight *= weight
+	
+	weight  *= 0.25
+	return K.categorical_crossentropy(weight*y_true,y_pred)
+	

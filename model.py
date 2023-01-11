@@ -7,6 +7,21 @@ from tensorflow.keras.models import Model
 from tensorflow.keras import backend as K
 import numpy as np 
 
+def conv2d(inputs,filters=32,kernel_size=3,strides=1,name=None):
+	conv = Conv2D(filters = filters,kernel_size=kernel_size,strides=strides,
+					kernel_initializer='he_normal',name=name,padding='same')
+	return conv(inputs)
+
+
+def conv_layer(inputs,filters=32,kernel_size=3,strides=1,use_maxpool=True,postfix=None,activation=None):
+	x = conv2d(inputs,filters=filters,kernel_size=kernel_size,strides=strides,name='conv'+postfix)
+	x = BatchNormalization(name='bn'+postfix)(x)
+	x = ELU(name='elu'+postfix)(x)
+	if use_maxpool:
+		x = MaxPooling2D(name='pool'+postfix)(x)
+	return x 
+	
+
 
 def build_ssd(input_shape,backone,n_layers = 4,n_classes = 4,aspect_ratios=(1,2,0.5)):
 	'''Build SSD model given a backone
