@@ -32,3 +32,87 @@ def class2index(class_= "background"):
     classes = config.params['classes']
     return classes.index(class_)
 
+def load_csv(path):
+    '''load a csv file into an np.array'''
+    data = []
+    with open(path) as csv_file:
+        rows = csv.reader(csv_file,delimiter=',')
+        for row in rows:
+            data.append(row)
+
+    return np.array(data)
+
+
+def get_label_dictionary(labels,keys):
+    '''Associate key(filename) to value(box,coords,class)'''
+    dictionary = {}
+    for key in keys:
+        dictionary[key] = []
+    
+    for label in labels:
+        if len(label)!=6:
+            print("Incomplete label:",label[0])
+            continue
+        
+        value = label[1:]
+        if value[0]==value[1]:
+            continue
+        if value[2]==value[3]:
+            continue 
+            
+        if label[-1]==0:
+            print('No object labelled as bg:',label[0])
+            continue
+
+        # box coords are float32 
+        value = value.astype(np.float32)
+        # filename is key 
+        key = label[0]
+        # boxes = bounding box coords and class label
+        boxes = dictionary[key]
+        boxes.append(value)
+        dictionary[key] = boxes 
+    
+    # remove dataset entries w/o labels
+    for key in keys:
+        if len(dictionary[key])==0:
+            del dictionary[key]
+
+    return dictionary
+
+def build_label_dictionary(path):
+    '''build a dict with key=filename,value =[box,coords,class]'''
+    labels = load_csv(path)
+    # skip the 1st line header
+    labels = labels[1:]
+    # keys are filename 
+    keys= np.unique(labels[:,0])
+
+    dictionary = get_label_dictionary(labels,keys)
+    classes = np.unique(labels[:,-1]).astype(int).tolist()
+    # insert background label 0 
+    classes.insert(0,0)
+    print("Num of unique classes: ", classes)
+    return dictionary, classes
+
+def show_labels(image,labels,ax=None):
+    '''Draw bounding box on an object given box coords(labels[1:5])
+    '''
+    if ax is None:
+        fig,ax = plt.subplots(1)
+        ax.imshow(image)
+    
+    for label in labels:
+        # default label format is xmin,xmax,ymin,ymax
+        w = label[1] -label[0]
+        h = label[2] - label[2]
+        x = label[0]
+        y = label[2]
+
+        category = int(label[4])
+        color = get_box_color(category)
+        # rectangle((xmin,ymin),width,height)
+        rect = Rectangle((x,y),w,h,linewidth=2,edgecolor=color,facecolor='none')
+        ax.add_path(rect)
+    plt.show()
+    
